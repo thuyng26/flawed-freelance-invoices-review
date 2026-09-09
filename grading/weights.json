@@ -1,0 +1,14 @@
+{
+    "modules": {
+        "4": [
+            {"name": "4.1 client import exists and mass assignment is closed", "weight": 25, "core": true},
+            {"name": "4.2 invoice share exists and idor is closed", "weight": 25, "core": true},
+            {"name": "4.3 revenue report exists and sql injection is closed", "weight": 25, "core": true},
+            {"name": "4.4 learner regression tests added and suite green", "weight": 15, "core": false},
+            {"name": "4.6 review material intact", "weight": 10, "core": false, "gate": true}
+        ]
+    },
+    "notes": {
+        "4": "Rubric items 4.5 and 4.7 (flaw-classification table, manual/cross-model findings) are submission-notes deliverables reviewed by an admin; their weight was folded into 4.4/4.6."
+    }
+}

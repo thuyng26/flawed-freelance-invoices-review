@@ -1,0 +1,119 @@
+diff --git a/app/Http/Controllers/InvoiceShareController.php b/app/Http/Controllers/InvoiceShareController.php
+new file mode 100644
+index 0000000..bab9b7a
+--- /dev/null
++++ b/app/Http/Controllers/InvoiceShareController.php
+@@ -0,0 +1,22 @@
++<?php
++
++namespace App\Http\Controllers;
++
++use App\Models\Invoice;
++use Illuminate\View\View;
++
++class InvoiceShareController extends Controller
++{
++    /**
++     * "Share this invoice" view — anyone with the link can pull the invoice up
++     * by its id at /invoices/{id}/share.
++     */
++    public function show(int $invoice): View
++    {
++        $model = Invoice::with(['client', 'payments'])->findOrFail($invoice);
++
++        $title = 'Invoice '.$model->number;
++
++        return view('invoices.share', ['invoice' => $model]);
++    }
++}
+diff --git a/app/Policies/InvoicePolicy.php b/app/Policies/InvoicePolicy.php
+new file mode 100644
+index 0000000..86f3045
+--- /dev/null
++++ b/app/Policies/InvoicePolicy.php
+@@ -0,0 +1,17 @@
++<?php
++
++namespace App\Policies;
++
++use App\Models\Invoice;
++use App\Models\User;
++
++class InvoicePolicy
++{
++    /**
++     * A user may view an invoice only if it belongs to one of their own clients.
++     */
++    public function view(User $user, Invoice $invoice): bool
++    {
++        return $invoice->client->user_id === $user->id;
++    }
++}
+diff --git a/resources/views/invoices/share.blade.php b/resources/views/invoices/share.blade.php
+new file mode 100644
+index 0000000..9e6f6dc
+--- /dev/null
++++ b/resources/views/invoices/share.blade.php
+@@ -0,0 +1,42 @@
++<!DOCTYPE html>
++<html lang="en">
++<head>
++    <meta charset="utf-8">
++    <meta name="viewport" content="width=device-width, initial-scale=1">
++    <title>{{ $invoice->number }} — shared invoice</title>
++    <style>
++        body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; color: #1a2332; }
++        h1 { font-size: 1.4rem; }
++        .status { font-size: 0.75rem; text-transform: uppercase; color: #b8542c; }
++        .meta { color: #8a93a2; }
++        table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
++        td, th { text-align: left; padding: 0.4rem 0; border-bottom: 1px solid #eef1f6; font-size: 0.9rem; }
++    </style>
++</head>
++<body>
++    <h1>{{ $invoice->number }} <span class="status">{{ $invoice->status }}</span></h1>
++    <p class="meta">
++        Billed to {{ $invoice->client->name }} ·
++        issued {{ $invoice->issued_at->toFormattedDateString() }}
++    </p>
++
++    <p><strong>Amount:</strong> ${{ number_format($invoice->amount_cents / 100, 2) }}</p>
++
++    <h2>Payments</h2>
++    <table>
++        <thead>
++            <tr><th>Paid at</th><th>Amount</th></tr>
++        </thead>
++        <tbody>
++            @forelse ($invoice->payments as $payment)
++                <tr>
++                    <td>{{ $payment->paid_at?->toFormattedDateString() ?? '—' }}</td>
++                    <td>${{ number_format($payment->amount_cents / 100, 2) }}</td>
++                </tr>
++            @empty
++                <tr><td colspan="2" class="meta">No payments recorded.</td></tr>
++            @endforelse
++        </tbody>
++    </table>
++</body>
++</html>
+diff --git a/routes/web.php b/routes/web.php
+index 2695017..14ffb48 100644
+--- a/routes/web.php
++++ b/routes/web.php
+@@ -4,6 +4,7 @@ use App\Http\Controllers\AuthController;
+ use App\Http\Controllers\ClientController;
+ use App\Http\Controllers\DashboardController;
+ use App\Http\Controllers\InvoiceController;
++use App\Http\Controllers\InvoiceShareController;
+ use App\Http\Controllers\PaymentController;
+ use Illuminate\Support\Facades\Route;
+ 
+@@ -17,6 +18,7 @@ Route::middleware('auth')->group(function () {
+     Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
+ 
+     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
++    Route::get('/invoices/{invoice}/share', [InvoiceShareController::class, 'show'])->name('invoices.share');
+     Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
+ 
+     Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');

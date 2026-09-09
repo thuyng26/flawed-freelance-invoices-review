@@ -1,0 +1,78 @@
+name: Grade
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  grade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GRADING_WEBHOOK_SECRET: ${{ secrets.GRADING_WEBHOOK_SECRET }}
+      GRADE_URL: ${{ vars.GRADE_URL }}
+      GRADE_MODULE: ${{ vars.GRADE_MODULE }}
+      GRADE_LESSON_SLUG: ${{ vars.GRADE_LESSON_SLUG }}
+    steps:
+      - name: Check grading configuration
+        id: config
+        run: |
+          if [ -z "$GRADING_WEBHOOK_SECRET" ] || [ -z "$GRADE_URL" ] || [ -z "$GRADE_MODULE" ] || [ -z "$GRADE_LESSON_SLUG" ]; then
+            echo "Grading not configured for this repository — skipping."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # Only the learner's own pushes are graded. The site names repos
+          # lab-{module}-{username}, so template-generation commits and
+          # maintainer pushes (different actor) skip instead of failing.
+          EXPECTED="lab-${GRADE_MODULE}-$(echo "$GITHUB_ACTOR" | tr '[:upper:]' '[:lower:]')"
+          NAME=$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')
+          if [ "$NAME" != "$EXPECTED" ]; then
+            echo "Push by '$GITHUB_ACTOR' is not this repo's learner — skipping grading."
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "configured=true" >> "$GITHUB_OUTPUT"
+
+      - name: Skip module 0 (graded by submission review)
+        if: steps.config.outputs.configured == 'true' && env.GRADE_MODULE == '0'
+        run: |
+          echo "Module 0 has no repo-gradeable criteria — the submission is reviewed by an admin. Skipping automated grading."
+
+      - uses: actions/checkout@v4
+        if: steps.config.outputs.configured == 'true' && env.GRADE_MODULE != '0'
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP
+        if: steps.config.outputs.configured == 'true' && env.GRADE_MODULE != '0'
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Install dependencies
+        if: steps.config.outputs.configured == 'true' && env.GRADE_MODULE != '0'
+        run: composer install --prefer-dist --no-progress --no-interaction
+
+      - name: Run grading suite
+        if: steps.config.outputs.configured == 'true' && env.GRADE_MODULE != '0'
+        run: |
+          cp -n .env.example .env 2>/dev/null || true
+          php artisan key:generate --force 2>/dev/null || true
+          ./vendor/bin/pest "grading/tests/Module${GRADE_MODULE}" --colors=never --log-junit grading-junit.xml || true
+
+      - name: Compute score and submit grade
+        if: steps.config.outputs.configured == 'true' && env.GRADE_MODULE != '0'
+        run: |
+          python3 grading/score.py
+          SIG=$(openssl dgst -sha256 -hmac "$GRADING_WEBHOOK_SECRET" -hex < payload.json | awk '{print $NF}')
+          STATUS=$(curl -s -o response.txt -w '%{http_code}' -X POST "$GRADE_URL" \
+            -H 'Content-Type: application/json' \
+            -H "X-Grade-Signature: sha256=$SIG" \
+            --data-binary @payload.json)
+          echo "Webhook response: $STATUS $(cat response.txt)"
+          [ "$STATUS" = "200" ] || exit 1
