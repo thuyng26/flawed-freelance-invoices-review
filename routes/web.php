@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\ClientImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
@@ -15,6 +16,9 @@ Route::middleware('auth')->group(function () {
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
 
     Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
+
+    Route::get('/clients/import', [ClientImportController::class, 'create'])->name('clients.import.create');
+    Route::post('/clients/import', [ClientImportController::class, 'store'])->name('clients.import.store');
 
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
     Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
