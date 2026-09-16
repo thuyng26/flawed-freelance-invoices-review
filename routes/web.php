@@ -5,6 +5,7 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\ClientImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InvoiceController;
+use App\Http\Controllers\InvoiceShareController;
 use App\Http\Controllers\PaymentController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +22,7 @@ Route::middleware('auth')->group(function () {
     Route::post('/clients/import', [ClientImportController::class, 'store'])->name('clients.import.store');
 
     Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('invoices.show');
+    Route::get('/invoices/{invoice}/share', [InvoiceShareController::class, 'show'])->name('invoices.share');
     Route::post('/invoices', [InvoiceController::class, 'store'])->name('invoices.store');
 
     Route::post('/invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('payments.store');
